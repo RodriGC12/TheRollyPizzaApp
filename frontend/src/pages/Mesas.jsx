@@ -289,7 +289,7 @@ export default function Mesas() {
             <div className="flex-1 flex overflow-hidden">
 
                 {/* MAPA DE MESAS */}
-                <div className="flex-1 relative overflow-hidden">
+                <div className={`relative overflow-hidden ${vista === 'orden' ? 'hidden md:flex flex-1' : 'flex-1'}`}>
                     {modoEdicion && esAdmin && (
                         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2" style={{ minWidth: 360 }}>
                             <div className="bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs px-4 py-2 rounded-xl flex items-center gap-3">
@@ -398,8 +398,7 @@ export default function Mesas() {
 
                 {/* PANEL LATERAL — ORDEN */}
                 {vista === 'orden' && mesaSeleccionada && (
-                    <div className="w-full max-w-sm bg-[#111318] border-l border-white/8 flex flex-col flex-shrink-0"
-                        style={{ minWidth: '320px' }}>
+                    <div className="w-full md:max-w-sm bg-[#111318] md:border-l border-white/8 flex flex-col flex-shrink-0">
 
                         {/* Header panel */}
                         <div className="px-5 py-4 border-b border-white/8 flex justify-between items-center">
@@ -411,8 +410,9 @@ export default function Mesas() {
                                 </p>
                             </div>
                             <button onClick={() => { setVista('mapa'); setMesaSeleccionada(null); setOrdenActiva(null) }}
-                                className="w-8 h-8 bg-[#1a1d24] rounded-lg flex items-center justify-center text-gray-400 hover:text-white">
-                                ✕
+                                className="flex items-center gap-1.5 bg-[#1a1d24] rounded-lg text-gray-400 hover:text-white transition px-3 py-1.5 md:px-0 md:py-0 md:w-8 md:h-8 md:justify-center text-sm">
+                                <span className="md:hidden">← Mesas</span>
+                                <span className="hidden md:inline">✕</span>
                             </button>
                         </div>
 
