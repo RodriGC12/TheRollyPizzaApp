@@ -986,6 +986,7 @@ function PaginaUsuarios() {
 function PaginaCaja() {
     const [estado, setEstado] = useState(null)
     const [historial, setHistorial] = useState([])
+    const [porCobrar, setPorCobrar] = useState([])
     const [montoApertura, setMontoApertura] = useState('')
     const [montoCierre, setMontoCierre] = useState('')
     const [observaciones, setObservaciones] = useState('')
@@ -999,6 +1000,7 @@ function PaginaCaja() {
         const [c, h] = await Promise.all([api.get('/caja'), api.get('/caja/historial')])
         setEstado(c.data)
         setHistorial(h.data)
+        setPorCobrar(c.data.porCobrar || [])
     }
 
     const abrirCaja = async () => {
@@ -1032,6 +1034,16 @@ function PaginaCaja() {
             cargar()
         } catch (err) {
             setMsg('❌ ' + (err.response?.data?.error || 'Error reabriendo caja'))
+        }
+    }
+
+    const cobrarOrden = async (orden) => {
+        try {
+            await api.patch(`/ordenes/${orden.orden_id}/estado`, { estado: 'Cerrada' })
+            setMsg(`✅ Cobro registrado — Mesa ${orden.nro_mesa} · $${Number(orden.total).toFixed(2)}`)
+            cargar()
+        } catch (err) {
+            setMsg('❌ ' + (err.response?.data?.error || 'Error registrando cobro'))
         }
     }
 
@@ -1130,6 +1142,38 @@ function PaginaCaja() {
                     </p>
                 </div>
             </div>
+            {/* Cuentas pendientes de cobro */}
+            {porCobrar.length > 0 && (
+                <div className="bg-[#111318] border border-yellow-500/25 rounded-2xl overflow-hidden mb-6">
+                    <div className="px-5 py-4 border-b border-white/8 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"/>
+                            <p className="text-white text-sm font-semibold">Cuentas pendientes de cobro</p>
+                        </div>
+                        <span className="text-yellow-400 text-xs font-bold bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-lg">
+                            {porCobrar.length} mesa{porCobrar.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div className="divide-y divide-white/5">
+                        {porCobrar.map(o => (
+                            <div key={o.orden_id} className="px-5 py-4 flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-white text-sm font-bold">Mesa {o.nro_mesa}</p>
+                                    <p className="text-gray-500 text-xs">{o.mesero} · Orden #{o.orden_id}</p>
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <p className="text-yellow-400 font-bold text-lg">${Number(o.total).toFixed(2)}</p>
+                                    <button onClick={() => cobrarOrden(o)}
+                                        className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition">
+                                        💰 Cobrar
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="bg-[#111318] border border-white/8 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-white/8 flex justify-between items-center">
                     <p className="text-white text-sm font-semibold">Órdenes cerradas hoy</p>

@@ -18,9 +18,20 @@ const getEstadoCaja = async (req, res) => {
             [hoy]
         );
 
+        const porCobrar = await pool.query(
+            `SELECT o.orden_id, m.numero AS nro_mesa, o.total,
+                    u.nombre_completo AS mesero, o.fecha_creacion
+             FROM ordenes o
+             JOIN mesas    m ON o.mesa_id   = m.mesa_id
+             JOIN usuarios u ON o.mesero_id = u.usuario_id
+             WHERE o.estado = 'PorCobrar'
+             ORDER BY o.fecha_creacion ASC`
+        );
+
         res.json({
-            caja:   caja.rows[0] || null,
-            ventas: ventas.rows[0]
+            caja:      caja.rows[0] || null,
+            ventas:    ventas.rows[0],
+            porCobrar: porCobrar.rows
         });
     } catch (err) {
         console.error(err);

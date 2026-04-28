@@ -102,19 +102,34 @@ const agregarProducto = async (req, res) => {
 const cambiarEstado = async (req, res) => {
     const { id } = req.params;
     const { estado } = req.body;
-    const estadosValidos = ['Pendiente', 'EnCocina', 'Lista', 'Cerrada', 'Cancelada'];
+    const estadosValidos = ['Pendiente', 'EnCocina', 'Lista', 'PorCobrar', 'Cerrada', 'Cancelada'];
     if (!estadosValidos.includes(estado))
         return res.status(400).json({ error: 'Estado inválido' });
     try {
         const campos = {
-            EnCocina: ', fecha_envio_cocina = NOW()',
-            Lista:    ', fecha_lista = NOW()',
-            Cerrada:  ', fecha_cierre = NOW()',
+            EnCocina:  ', fecha_envio_cocina = NOW()',
+            Lista:     ', fecha_lista = NOW()',
+            Cerrada:   ', fecha_cierre = NOW()',
         };
         await pool.query(
             `UPDATE ordenes SET estado = $1 ${campos[estado] || ''} WHERE orden_id = $2`,
             [estado, id]
         );
+
+        if (estado === 'PorCobrar') {
+            await pool.query(
+                `UPDATE mesas SET estado = 'EnProcesoDePago'
+                 WHERE mesa_id = (SELECT mesa_id FROM ordenes WHERE orden_id = $1)`,
+                [id]
+            );
+        } else if (estado === 'Cerrada') {
+            await pool.query(
+                `UPDATE mesas SET estado = 'Disponible'
+                 WHERE mesa_id = (SELECT mesa_id FROM ordenes WHERE orden_id = $1)`,
+                [id]
+            );
+        }
+
         res.json({ mensaje: `Orden actualizada a ${estado}` });
     } catch (err) {
         console.error(err);

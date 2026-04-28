@@ -112,18 +112,17 @@ export default function Mesas() {
         }
     }
 
-    const cerrarOrden = async () => {
+    const enviarACobro = async () => {
         if (!ordenActiva) return
-        if (!confirm('¿Cerrar esta orden? Se registrará en caja.')) return
         setCargando(true)
         try {
-            await api.patch(`/ordenes/${ordenActiva.orden_id}/estado`, { estado: 'Cerrada' })
-            setMsg('✅ Orden cerrada correctamente')
-            setOrdenActiva(null)
+            await api.patch(`/ordenes/${ordenActiva.orden_id}/estado`, { estado: 'PorCobrar' })
+            const res = await api.get(`/ordenes/${ordenActiva.orden_id}`)
+            setOrdenActiva(res.data)
             await cargar()
-            setTimeout(() => setVista('mapa'), 1200)
+            setMsg('✅ Cuenta enviada a caja para cobro')
         } catch (err) {
-            setMsg(err.response?.data?.error || 'Error cerrando orden')
+            setMsg(err.response?.data?.error || 'Error enviando a cobro')
         } finally {
             setCargando(false)
         }
@@ -548,33 +547,57 @@ export default function Mesas() {
                             )}
                         </div>
 
-                        {/* Footer — pre-cuenta y cerrar orden */}
+                        {/* Footer — pre-cuenta y cobro */}
                         {ordenActiva && (
                             <div className="p-5 border-t border-white/8 space-y-2">
-                                <button
-                                    onClick={() => generarTicketPDF(
-                                        {
-                                            orden_id: ordenActiva.orden_id,
-                                            nro_mesa: ordenActiva.nro_mesa ?? mesaSeleccionada.numero,
-                                            mesero:   ordenActiva.mesero   ?? usuario.nombre_completo,
-                                            total:    ordenActiva.total
-                                        },
-                                        ordenActiva.productos || []
-                                    )}
-                                    disabled={!ordenActiva.productos?.length}
-                                    className="w-full bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-40 border border-blue-500/20 text-blue-400 font-semibold py-2.5 rounded-xl transition text-sm">
-                                    🧾 Generar pre-cuenta
-                                </button>
-                                <button onClick={cerrarOrden} disabled={cargando || !ordenActiva.productos?.length}
-                                    className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-40 text-white font-semibold py-3 rounded-xl transition text-sm">
-                                    {cargando ? 'Cerrando...' : '💳 Cerrar orden y cobrar'}
-                                </button>
-                                <p className="text-center text-xs text-gray-500">Al cerrar se registra en caja automáticamente</p>
-                                {ordenActiva.estado === 'Pendiente' && (
-                                    <button onClick={desocuparMesa} disabled={cargando}
-                                        className="w-full text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/8 py-2 rounded-xl transition">
-                                        🗑 Desocupar mesa (eliminar orden)
-                                    </button>
+                                {ordenActiva.estado === 'PorCobrar' ? (
+                                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
+                                        <p className="text-yellow-400 text-sm font-semibold mb-1">⏳ Cuenta enviada a caja</p>
+                                        <p className="text-gray-500 text-xs">El cajero está procesando el cobro</p>
+                                        <button
+                                            onClick={() => generarTicketPDF(
+                                                {
+                                                    orden_id: ordenActiva.orden_id,
+                                                    nro_mesa: ordenActiva.nro_mesa ?? mesaSeleccionada.numero,
+                                                    mesero:   ordenActiva.mesero   ?? usuario.nombre_completo,
+                                                    total:    ordenActiva.total
+                                                },
+                                                ordenActiva.productos || []
+                                            )}
+                                            className="mt-3 w-full text-xs text-yellow-400 border border-yellow-500/20 py-1.5 rounded-lg hover:bg-yellow-500/10 transition">
+                                            🧾 Reimprimir pre-cuenta
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => generarTicketPDF(
+                                                {
+                                                    orden_id: ordenActiva.orden_id,
+                                                    nro_mesa: ordenActiva.nro_mesa ?? mesaSeleccionada.numero,
+                                                    mesero:   ordenActiva.mesero   ?? usuario.nombre_completo,
+                                                    total:    ordenActiva.total
+                                                },
+                                                ordenActiva.productos || []
+                                            )}
+                                            disabled={!ordenActiva.productos?.length}
+                                            className="w-full bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-40 border border-blue-500/20 text-blue-400 font-semibold py-2.5 rounded-xl transition text-sm">
+                                            🧾 Generar pre-cuenta
+                                        </button>
+                                        <button
+                                            onClick={enviarACobro}
+                                            disabled={cargando || !ordenActiva.productos?.length}
+                                            className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-40 text-white font-semibold py-3 rounded-xl transition text-sm">
+                                            {cargando ? 'Enviando...' : '💰 Enviar a cobro'}
+                                        </button>
+                                        <p className="text-center text-xs text-gray-500">El cajero registrará el pago y generará la factura</p>
+                                        {ordenActiva.estado === 'Pendiente' && (
+                                            <button onClick={desocuparMesa} disabled={cargando}
+                                                className="w-full text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/8 py-2 rounded-xl transition">
+                                                🗑 Desocupar mesa (eliminar orden)
+                                            </button>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )}
