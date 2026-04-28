@@ -18,13 +18,10 @@ export default function Login() {
         localStorage.setItem('usuario', JSON.stringify(res.data.usuario))
 
         const rol = (res.data.usuario.rol || '').toLowerCase()
-        if (rol === 'administrador' || rol === 'cajero') {
-            navigate('/dashboard')
-        } else if (rol === 'cocina') {
-            navigate('/cocina')
-        } else {
-            navigate('/mesas')
-        }
+        if (rol === 'administrador')  navigate('/dashboard')
+        else if (rol === 'cajero')    navigate('/caja')
+        else if (rol === 'cocina')    navigate('/cocina')
+        else                          navigate('/mesas')
     } catch (err) {
         setError(err.response?.data?.error || 'Error al iniciar sesión')
     } finally {

@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Mesas from './pages/Mesas'
 import Cocina from './pages/Cocina'
+import Caja from './pages/Caja'
 
 function rolNorm(rol) { return (rol || '').toLowerCase() }
 
@@ -23,8 +24,9 @@ function RutaInicio() {
     if (!token) return <Navigate to="/login" />
 
     const rol = rolNorm(usuario.rol)
-    if (rol === 'administrador' || rol === 'cajero') return <Navigate to="/dashboard" />
-    if (rol === 'cocina')                            return <Navigate to="/cocina" />
+    if (rol === 'administrador')  return <Navigate to="/dashboard" />
+    if (rol === 'cajero')         return <Navigate to="/caja" />
+    if (rol === 'cocina')         return <Navigate to="/cocina" />
     return <Navigate to="/mesas" />
 }
 
@@ -75,6 +77,11 @@ function App() {
                 <Route path="/cocina"      element={
                     <PrivateRoute roles={['Administrador', 'Cocina']}>
                         <Cocina />
+                    </PrivateRoute>
+                } />
+                <Route path="/caja"        element={
+                    <PrivateRoute roles={['Administrador', 'Cajero']}>
+                        <Caja />
                     </PrivateRoute>
                 } />
             </Routes>
