@@ -590,10 +590,10 @@ export default function Mesas() {
                                             {cargando ? 'Enviando...' : '💰 Enviar a cobro'}
                                         </button>
                                         <p className="text-center text-xs text-gray-500">El cajero registrará el pago y generará la factura</p>
-                                        {ordenActiva.estado === 'Pendiente' && (
+                                        {!['Cerrada', 'Cancelada'].includes(ordenActiva.estado) && (
                                             <button onClick={desocuparMesa} disabled={cargando}
                                                 className="w-full text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/8 py-2 rounded-xl transition">
-                                                🗑 Desocupar mesa (eliminar orden)
+                                                🗑 Cancelar orden y desocupar mesa
                                             </button>
                                         )}
                                     </>

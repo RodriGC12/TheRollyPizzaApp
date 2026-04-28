@@ -170,8 +170,8 @@ const eliminarOrden = async (req, res) => {
         );
         if (orden.rows.length === 0)
             return res.status(404).json({ error: 'Orden no encontrada' });
-        if (orden.rows[0].estado !== 'Pendiente')
-            return res.status(400).json({ error: 'Solo se pueden eliminar órdenes Pendientes' });
+        if (['Cerrada', 'Cancelada'].includes(orden.rows[0].estado))
+            return res.status(400).json({ error: 'No se puede cancelar una orden ya cerrada o cancelada' });
 
         await pool.query(`DELETE FROM orden_detalle WHERE orden_id = $1`, [id]);
         await pool.query(`DELETE FROM ordenes WHERE orden_id = $1`, [id]);
