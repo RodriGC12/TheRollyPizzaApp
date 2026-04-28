@@ -3,6 +3,7 @@ const router      = express.Router();
 const auth        = require('../middleware/auth');
 const {
     getOrdenesActivas,
+    getOrdenesCocinero,
     getDetalleOrden,
     crearOrden,
     agregarProducto,
@@ -11,8 +12,9 @@ const {
     eliminarProductoOrden
 } = require('../controllers/ordenesController');
 
-router.get('/',                        auth, getOrdenesActivas);
-router.get('/:id',                     auth, getDetalleOrden);
+router.get('/',         auth, getOrdenesActivas);
+router.get('/cocina',   auth, getOrdenesCocinero);
+router.get('/:id',      auth, getDetalleOrden);
 router.post('/',                       auth, crearOrden);
 router.post('/:id/producto',           auth, agregarProducto);
 router.patch('/:id/estado',            auth, cambiarEstado);

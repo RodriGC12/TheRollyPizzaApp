@@ -17,9 +17,11 @@ export default function Login() {
         localStorage.setItem('token', res.data.token)
         localStorage.setItem('usuario', JSON.stringify(res.data.usuario))
 
-        const rol = res.data.usuario.rol
-        if (rol === 'Administrador' || rol === 'Cajero') {
+        const rol = (res.data.usuario.rol || '').toLowerCase()
+        if (rol === 'administrador' || rol === 'cajero') {
             navigate('/dashboard')
+        } else if (rol === 'cocina') {
+            navigate('/cocina')
         } else {
             navigate('/mesas')
         }

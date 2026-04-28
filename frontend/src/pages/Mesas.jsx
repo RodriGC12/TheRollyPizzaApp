@@ -92,18 +92,17 @@ export default function Mesas() {
         if (!prodSel || !ordenActiva) return
         setCargando(true)
         try {
-            await api.post(`/ordenes/${ordenActiva.orden_id}/producto`, {
+            const { data } = await api.post(`/ordenes/${ordenActiva.orden_id}/producto`, {
                 producto_id: prodSel,
                 cantidad: parseInt(cantidad),
                 observacion: obsProducto
             })
-            await api.patch(`/ordenes/${ordenActiva.orden_id}/estado`, { estado: 'EnCocina' })
             const res = await api.get(`/ordenes/${ordenActiva.orden_id}`)
             setOrdenActiva(res.data)
             setProdSel('')
             setCantidad(1)
             setObsProducto('')
-            setMsg('✅ Producto agregado y enviado a cocina')
+            setMsg(data.reenviada ? '✅ Producto agregado — cocina notificada' : '✅ Producto agregado')
             cargar()
         } catch (err) {
             setMsg(err.response?.data?.error || 'Error agregando producto')

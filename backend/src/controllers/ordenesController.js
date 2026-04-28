@@ -92,7 +92,32 @@ const agregarProducto = async (req, res) => {
              VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             [id, producto_id, cantidad, precio, observacion]
         );
-        res.status(201).json(result.rows[0]);
+
+        // Gestionar estado según dónde esté la orden
+        const { rows } = await pool.query(`SELECT estado FROM ordenes WHERE orden_id = $1`, [id]);
+        const estado = rows[0]?.estado;
+        let reenviada = false;
+
+        if (estado === 'Pendiente') {
+            await pool.query(
+                `UPDATE ordenes SET estado = 'EnCocina', fecha_envio_cocina = NOW() WHERE orden_id = $1`, [id]
+            );
+            reenviada = true;
+        } else if (estado === 'EnCocina') {
+            // Resetea el timer para que cocina note la actualización
+            await pool.query(
+                `UPDATE ordenes SET fecha_envio_cocina = NOW() WHERE orden_id = $1`, [id]
+            );
+            reenviada = true;
+        } else if (estado === 'Lista') {
+            // El cliente pidió algo más después de que cocina lo marcó listo
+            await pool.query(
+                `UPDATE ordenes SET estado = 'EnCocina', fecha_envio_cocina = NOW() WHERE orden_id = $1`, [id]
+            );
+            reenviada = true;
+        }
+
+        res.status(201).json({ ...result.rows[0], reenviada });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Error agregando producto' });
@@ -181,8 +206,37 @@ const eliminarProductoOrden = async (req, res) => {
     }
 };
 
+const getOrdenesCocinero = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT o.orden_id, m.numero AS nro_mesa, o.fecha_envio_cocina,
+                    (o.fecha_lista IS NOT NULL) AS reagendada,
+                    json_agg(
+                        json_build_object(
+                            'detalle_id', od.detalle_id,
+                            'producto',   p.nombre,
+                            'cantidad',   od.cantidad,
+                            'observacion', od.observacion
+                        ) ORDER BY od.detalle_id
+                    ) AS productos
+             FROM ordenes o
+             JOIN mesas        m  ON m.mesa_id       = o.mesa_id
+             JOIN orden_detalle od ON od.orden_id     = o.orden_id
+             JOIN productos     p  ON p.producto_id  = od.producto_id
+             WHERE o.estado = 'EnCocina'
+             GROUP BY o.orden_id, m.numero, o.fecha_envio_cocina, o.fecha_lista
+             ORDER BY o.fecha_envio_cocina ASC`
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error obteniendo órdenes de cocina' });
+    }
+};
+
 module.exports = {
     getOrdenesActivas,
+    getOrdenesCocinero,
     getDetalleOrden,
     crearOrden,
     agregarProducto,
