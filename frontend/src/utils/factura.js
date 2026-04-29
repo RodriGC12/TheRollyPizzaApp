@@ -120,7 +120,7 @@ export function generarTicketPDF(orden, productos) {
     doc.save(`precuenta-mesa${orden.nro_mesa}-orden${orden.orden_id}.pdf`)
 }
 
-export function generarFacturaPDF(orden, productos) {
+export function generarFacturaPDF(orden, productos, pago = null) {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
     const W = doc.internal.pageSize.getWidth()
 
@@ -252,8 +252,43 @@ export function generarFacturaPDF(orden, productos) {
     doc.setTextColor(74, 222, 128)
     doc.text(`$${Number(orden.total).toFixed(2)}`, W - 16, afterTable + 8.5, { align: 'right' })
 
+    // ── INFORMACIÓN DE PAGO ──────────────────────────────────────────
+    let footerStart = afterTable + 28
+    if (pago) {
+        let py = afterTable + 22
+        doc.setFontSize(8.5)
+
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(100, 116, 139)
+        doc.text('Forma de pago:', W - 82, py)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(15, 23, 42)
+        doc.text(pago.metodo === 'efectivo' ? 'Efectivo' : 'Tarjeta', W - 16, py, { align: 'right' })
+        py += 7
+
+        if (pago.metodo === 'efectivo' && pago.montoRecibido != null) {
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(100, 116, 139)
+            doc.text('Recibido:', W - 82, py)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(15, 23, 42)
+            doc.text(`$${Number(pago.montoRecibido).toFixed(2)}`, W - 16, py, { align: 'right' })
+            py += 7
+
+            doc.setFont('helvetica', 'bold')
+            doc.setTextColor(100, 116, 139)
+            doc.text('Cambio:', W - 82, py)
+            doc.setFont('helvetica', 'bold')
+            doc.setTextColor(22, 163, 74)
+            doc.text(`$${Number(pago.vuelto).toFixed(2)}`, W - 16, py, { align: 'right' })
+            py += 7
+        }
+
+        footerStart = py + 4
+    }
+
     // ── FOOTER ───────────────────────────────────────────────────────
-    const footerY = afterTable + 28
+    const footerY = footerStart
     doc.setDrawColor(226, 232, 240)
     doc.setLineWidth(0.4)
     doc.line(14, footerY, W - 14, footerY)

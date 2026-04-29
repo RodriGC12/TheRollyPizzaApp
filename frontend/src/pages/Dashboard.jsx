@@ -1482,6 +1482,9 @@ function PaginaCaja() {
     const [pinReabrir,     setPinReabrir]     = useState('')
     const [mostrarReabrir, setMostrarReabrir] = useState(false)
     const [cargando,       setCargando]       = useState(false)
+    const [pagoModal,      setPagoModal]      = useState(null)
+    const [metodoPago,     setMetodoPago]     = useState('')
+    const [montoRecibido,  setMontoRecibido]  = useState('')
 
     useEffect(() => {
         cargar()
@@ -1541,13 +1544,32 @@ function PaginaCaja() {
         } finally { setCargando(false) }
     }
 
-    const cobrarOrden = async (orden) => {
+    const abrirPagoModal = (orden) => {
+        setPagoModal(orden)
+        setMetodoPago('')
+        setMontoRecibido('')
+    }
+
+    const cerrarPagoModal = () => {
+        setPagoModal(null)
+        setMetodoPago('')
+        setMontoRecibido('')
+    }
+
+    const confirmarCobro = async () => {
+        if (!metodoPago) return
         setCargando(true)
         try {
-            await api.patch(`/ordenes/${orden.orden_id}/estado`, { estado: 'Cerrada' })
-            mostrarMsg(`Cobro registrado · Mesa ${orden.nro_mesa} · $${Number(orden.total).toFixed(2)}`)
-            const res = await api.get(`/ordenes/${orden.orden_id}`)
-            generarFacturaPDF(orden, res.data.productos)
+            await api.patch(`/ordenes/${pagoModal.orden_id}/estado`, { estado: 'Cerrada' })
+            const pago = {
+                metodo: metodoPago,
+                montoRecibido: metodoPago === 'efectivo' ? parseFloat(montoRecibido) : null,
+                vuelto: metodoPago === 'efectivo' ? parseFloat(montoRecibido) - Number(pagoModal.total) : null,
+            }
+            const res = await api.get(`/ordenes/${pagoModal.orden_id}`)
+            generarFacturaPDF(pagoModal, res.data.productos, pago)
+            mostrarMsg(`Cobro registrado · Mesa ${pagoModal.nro_mesa} · $${Number(pagoModal.total).toFixed(2)}`)
+            cerrarPagoModal()
             cargar()
         } catch (err) {
             mostrarMsg(err.response?.data?.error || 'Error registrando cobro', 'err')
@@ -1609,7 +1631,7 @@ function PaginaCaja() {
                                 </div>
                                 <div className="p-4 flex flex-col gap-3 flex-1">
                                     <p className="text-amber-400 text-3xl font-black">${Number(o.total).toFixed(2)}</p>
-                                    <button onClick={() => cobrarOrden(o)} disabled={cargando}
+                                    <button onClick={() => abrirPagoModal(o)} disabled={cargando}
                                         className="w-full py-3 text-white text-sm font-bold rounded-xl transition disabled:opacity-50 active:scale-95"
                                         style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 4px 14px rgba(34,197,94,0.25)' }}>
                                         💰 Cobrar y facturar
@@ -1784,6 +1806,124 @@ function PaginaCaja() {
                     </div>
                 </div>
             </section>
+
+            {/* ── MODAL DE PAGO ── */}
+            {pagoModal && (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+                    onClick={cerrarPagoModal}>
+                    <div className="bg-[#111318] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden"
+                        onClick={e => e.stopPropagation()}>
+
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-white/8"
+                            style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(22,163,74,0.04))' }}>
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <p className="text-white font-bold">Registrar cobro</p>
+                                    <p className="text-gray-500 text-xs">Mesa {pagoModal.nro_mesa} · Orden #{pagoModal.orden_id}</p>
+                                </div>
+                                <button onClick={cerrarPagoModal}
+                                    className="w-8 h-8 bg-white/5 border border-white/8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white text-sm transition">
+                                    ✕
+                                </button>
+                            </div>
+                            <div className="text-center py-2">
+                                <p className="text-gray-400 text-xs mb-1">Total a cobrar</p>
+                                <p className="text-4xl font-black text-white">${Number(pagoModal.total).toFixed(2)}</p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            {/* Selección de método */}
+                            <div>
+                                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">Forma de pago</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => { setMetodoPago('efectivo'); setMontoRecibido('') }}
+                                        className={`py-4 rounded-xl border-2 font-bold text-sm transition flex flex-col items-center gap-2 ${
+                                            metodoPago === 'efectivo'
+                                                ? 'border-green-500/60 bg-green-500/15 text-green-400'
+                                                : 'border-white/10 bg-white/4 text-gray-400 hover:border-white/20 hover:text-white'
+                                        }`}>
+                                        <span className="text-2xl">💵</span>
+                                        Efectivo
+                                    </button>
+                                    <button onClick={() => { setMetodoPago('tarjeta'); setMontoRecibido('') }}
+                                        className={`py-4 rounded-xl border-2 font-bold text-sm transition flex flex-col items-center gap-2 ${
+                                            metodoPago === 'tarjeta'
+                                                ? 'border-blue-500/60 bg-blue-500/15 text-blue-400'
+                                                : 'border-white/10 bg-white/4 text-gray-400 hover:border-white/20 hover:text-white'
+                                        }`}>
+                                        <span className="text-2xl">💳</span>
+                                        Tarjeta
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Efectivo: monto recibido + vuelto */}
+                            {metodoPago === 'efectivo' && (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">
+                                            Monto recibido del cliente
+                                        </label>
+                                        <input
+                                            type="number" step="0.01"
+                                            placeholder={`Mínimo $${Number(pagoModal.total).toFixed(2)}`}
+                                            value={montoRecibido}
+                                            onChange={e => setMontoRecibido(e.target.value)}
+                                            autoFocus
+                                            className="w-full bg-[#1a1d24] border border-white/8 rounded-xl px-4 py-3 text-white text-lg font-bold outline-none transition"
+                                            style={{ fontSize: '16px' }}
+                                            onFocus={e => e.target.style.borderColor = '#22c55e'}
+                                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                                        />
+                                    </div>
+                                    {montoRecibido && parseFloat(montoRecibido) >= Number(pagoModal.total) && (
+                                        <div className="rounded-xl px-4 py-3 flex justify-between items-center bg-green-500/10 border border-green-500/20">
+                                            <p className="text-green-300 font-semibold text-sm">Vuelto</p>
+                                            <p className="text-green-400 text-2xl font-black">
+                                                ${(parseFloat(montoRecibido) - Number(pagoModal.total)).toFixed(2)}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {montoRecibido && parseFloat(montoRecibido) < Number(pagoModal.total) && (
+                                        <div className="rounded-xl px-4 py-3 flex justify-between items-center bg-red-500/10 border border-red-500/20">
+                                            <p className="text-red-300 font-semibold text-sm">Monto insuficiente</p>
+                                            <p className="text-red-400 font-bold text-sm">
+                                                Faltan ${(Number(pagoModal.total) - parseFloat(montoRecibido)).toFixed(2)}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {metodoPago === 'tarjeta' && (
+                                <div className="rounded-xl px-4 py-3 bg-blue-500/8 border border-blue-500/20">
+                                    <p className="text-blue-300 text-sm font-semibold">💳 Cobro por tarjeta</p>
+                                    <p className="text-blue-400/70 text-xs mt-0.5">Se generará la factura directamente</p>
+                                </div>
+                            )}
+
+                            {/* Botones */}
+                            <div className="flex gap-3 pt-1">
+                                <button onClick={cerrarPagoModal}
+                                    className="flex-1 py-3 text-gray-400 border border-white/8 rounded-xl text-sm font-medium hover:text-white hover:bg-white/5 transition">
+                                    Cancelar
+                                </button>
+                                <button onClick={confirmarCobro}
+                                    disabled={
+                                        !metodoPago || cargando ||
+                                        (metodoPago === 'efectivo' && (!montoRecibido || parseFloat(montoRecibido) < Number(pagoModal.total)))
+                                    }
+                                    className="flex-1 py-3 text-white rounded-xl text-sm font-bold transition active:scale-[0.98] disabled:opacity-40"
+                                    style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 4px 14px rgba(34,197,94,0.25)' }}>
+                                    {cargando ? 'Procesando...' : '✓ Confirmar cobro'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
