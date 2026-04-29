@@ -142,35 +142,37 @@ export default function Caja() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     {/* Estado caja */}
-                    <div className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border ${
+                    <div className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${
                         cajaAbierta
                             ? 'text-green-400 bg-green-500/10 border-green-500/20'
                             : cajaCerrada
                                 ? 'text-red-400 bg-red-500/10 border-red-500/20'
                                 : 'text-gray-400 bg-white/5 border-white/10'
                     }`}>
-                        <span className={`w-2 h-2 rounded-full ${cajaAbierta ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}/>
-                        {cajaAbierta ? 'Caja abierta' : cajaCerrada ? 'Caja cerrada' : 'Sin caja hoy'}
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cajaAbierta ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}/>
+                        <span className="hidden sm:inline">{cajaAbierta ? 'Abierta' : cajaCerrada ? 'Cerrada' : 'Sin caja'}</span>
                     </div>
 
                     {/* Ventas del día */}
-                    <div className="hidden sm:flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg font-semibold">
+                    <div className="hidden md:flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1.5 rounded-lg font-semibold">
                         ${totalVentas.toFixed(2)} hoy
                     </div>
 
                     {/* Pendientes */}
                     {porCobrar.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-lg">
-                            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"/>
-                            {porCobrar.length} por cobrar
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1.5 rounded-lg">
+                            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse flex-shrink-0"/>
+                            <span>{porCobrar.length}</span>
+                            <span className="hidden sm:inline">por cobrar</span>
                         </div>
                     )}
 
                     <button onClick={cerrarSesion}
-                        className="text-xs text-gray-500 hover:text-red-400 border border-white/8 hover:border-red-500/30 px-3 py-1.5 rounded-lg transition">
-                        Cerrar sesión
+                        className="text-xs text-gray-500 hover:text-red-400 border border-white/8 hover:border-red-500/30 px-2.5 py-1.5 rounded-lg transition">
+                        <span className="hidden sm:inline">Cerrar sesión</span>
+                        <span className="sm:hidden">✕</span>
                     </button>
                 </div>
             </div>

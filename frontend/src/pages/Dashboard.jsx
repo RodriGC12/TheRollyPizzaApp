@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { generarFacturaPDF } from '../utils/factura'
+import { DollarSign, ShoppingBag, Users, TrendingUp } from 'lucide-react'
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, AreaChart, Area
+} from 'recharts'
 
 
 
@@ -9,8 +14,11 @@ export default function Dashboard() {
     const usuario = JSON.parse(localStorage.getItem('usuario') || '{}')
     const [paginaActiva, setPaginaActiva] = useState('dashboard')
     const [ordenesActivas, setOrdenesActivas] = useState([])
-    const [ventasDia, setVentasDia] = useState({ total_ventas: 0, total_ordenes: 0 })
-    const [cargando, setCargando] = useState(false)
+    const [ventasDia,      setVentasDia]      = useState({ total_ventas: 0, total_ordenes: 0 })
+    const [ventasSemana,   setVentasSemana]   = useState([])
+    const [ventasHora,     setVentasHora]     = useState([])
+    const [mesas,          setMesas]          = useState([])
+    const [cargando,       setCargando]       = useState(false)
     const navigate = useNavigate()
 
     useEffect(() => { cargarDatos() }, [])
@@ -18,12 +26,42 @@ export default function Dashboard() {
     const cargarDatos = async () => {
         setCargando(true)
         try {
-            const [ordenes, caja] = await Promise.all([
+            const hoy = new Date()
+            const fechas = Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(hoy)
+                d.setDate(d.getDate() - (6 - i))
+                return d.toISOString().split('T')[0]
+            })
+
+            const [ordenes, caja, mesasRes, ...historiales] = await Promise.all([
                 api.get('/ordenes'),
-                api.get('/caja')
+                api.get('/caja'),
+                api.get('/mesas'),
+                ...fechas.map(f => api.get(`/caja/historial?fecha=${f}`))
             ])
+
             setOrdenesActivas(ordenes.data)
             setVentasDia(caja.data.ventas)
+            setMesas(mesasRes.data)
+
+            const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+            setVentasSemana(fechas.map((fecha, i) => {
+                const d = new Date(fecha + 'T12:00:00')
+                const total = historiales[i].data.reduce((s, o) => s + Number(o.total), 0)
+                return { dia: dias[d.getDay()], ventas: parseFloat(total.toFixed(2)) }
+            }))
+
+            // Ventas por hora del día de hoy
+            const todayOrdenes = historiales[6].data
+            const horas = {}
+            for (let h = 8; h <= 22; h++) horas[`${h}h`] = 0
+            todayOrdenes.forEach(o => {
+                const h = new Date(o.fecha_cierre).getHours()
+                const key = `${h}h`
+                if (key in horas) horas[key] = parseFloat((horas[key] + Number(o.total)).toFixed(2))
+            })
+            setVentasHora(Object.entries(horas).map(([hora, ventas]) => ({ hora, ventas })))
+
         } catch (err) {
             console.error(err)
         } finally {
@@ -104,24 +142,26 @@ export default function Dashboard() {
             </aside>
 
             <div className="flex-1 flex flex-col min-w-0">
-                <div className="bg-[#111318] border-b border-white/8 px-4 md:px-7 py-4 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-white text-base md:text-lg font-semibold">
+                <div className="bg-[#111318] border-b border-white/8 px-4 md:px-7 py-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                        <h1 className="text-white text-sm md:text-base font-semibold truncate">
                             {navItems.find(n => n.id === paginaActiva)?.label}
                         </h1>
-                        <p className="text-gray-500 text-xs mt-0.5">Paris Rolly Pizza · Admin</p>
+                        <p className="text-gray-500 text-xs hidden sm:block">Paris Rolly Pizza · Admin</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={() => navigate('/mesas')}
-                       className="text-xs text-blue-400 border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 rounded-lg hover:bg-blue-500/20 transition">
-                        🗺 Mapa de mesas
+                            className="text-xs text-blue-400 border border-blue-500/20 bg-blue-500/10 px-2.5 py-1.5 rounded-lg hover:bg-blue-500/20 transition">
+                            <span className="hidden sm:inline">🗺 Mapa de mesas</span>
+                            <span className="sm:hidden">🗺</span>
                         </button>
                         {paginaActiva === 'dashboard' && (
-                            <button onClick={cargarDatos} className="text-xs text-gray-400 hover:text-blue-400 border border-white/8 px-3 py-1.5 rounded-lg transition">
-                                {cargando ? '⟳ Actualizando...' : '⟳ Actualizar'}
+                            <button onClick={cargarDatos} className="text-xs text-gray-400 hover:text-blue-400 border border-white/8 px-2.5 py-1.5 rounded-lg transition">
+                                <span className="hidden sm:inline">{cargando ? '⟳ Actualizando...' : '⟳ Actualizar'}</span>
+                                <span className="sm:hidden">⟳</span>
                             </button>
                         )}
-                        <div className="text-xs text-gray-500 bg-[#1a1d24] border border-white/8 px-3 py-1.5 rounded-lg">
+                        <div className="hidden md:block text-xs text-gray-500 bg-[#1a1d24] border border-white/8 px-2.5 py-1.5 rounded-lg">
                             {new Date().toLocaleDateString('es-SV', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </div>
                     </div>
@@ -129,120 +169,15 @@ export default function Dashboard() {
 
                 <div className="flex-1 p-4 md:p-7 overflow-y-auto">
                     {paginaActiva === 'dashboard' && (
-                        <div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6">
-                                <div className="bg-[#111318] border border-white/8 rounded-2xl p-4 md:p-5">
-                                    <div className="w-9 h-9 bg-blue-500/15 rounded-xl flex items-center justify-center text-blue-400 text-sm mb-3">$</div>
-                                    <p className="text-white text-2xl font-bold">${Number(ventasDia.total_ventas || 0).toFixed(2)}</p>
-                                    <p className="text-gray-500 text-xs mt-1">Ventas del día</p>
-                                </div>
-                                <div className="bg-[#111318] border border-white/8 rounded-2xl p-4 md:p-5">
-                                    <div className="w-9 h-9 bg-green-500/15 rounded-xl flex items-center justify-center text-green-400 text-sm mb-3">✓</div>
-                                    <p className="text-white text-2xl font-bold">{ventasDia.total_ordenes || 0}</p>
-                                    <p className="text-gray-500 text-xs mt-1">Pedidos cerrados</p>
-                                </div>
-                                <div className="bg-[#111318] border border-white/8 rounded-2xl p-4 md:p-5 col-span-2 md:col-span-1">
-                                    <div className="w-9 h-9 bg-yellow-500/15 rounded-xl flex items-center justify-center text-yellow-400 text-sm mb-3">⏳</div>
-                                    <p className="text-white text-2xl font-bold">{ordenesActivas.length}</p>
-                                    <p className="text-gray-500 text-xs mt-1">Órdenes activas</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <div className="bg-[#111318] border border-white/8 rounded-2xl p-5">
-                                    <p className="text-white text-sm font-semibold mb-4">Órdenes por estado</p>
-                                    {(() => {
-                                        const estados = ['Pendiente', 'EnCocina', 'Lista']
-                                        const colores = {
-                                            Pendiente: { bar: 'bg-yellow-400', text: 'text-yellow-400' },
-                                            EnCocina:  { bar: 'bg-blue-400',   text: 'text-blue-400'   },
-                                            Lista:     { bar: 'bg-green-400',  text: 'text-green-400'  },
-                                        }
-                                        const max = Math.max(...estados.map(e => ordenesActivas.filter(o => o.estado === e).length), 1)
-                                        return (
-                                            <div className="space-y-3">
-                                                {estados.map(estado => {
-                                                    const count = ordenesActivas.filter(o => o.estado === estado).length
-                                                    const pct = Math.round((count / max) * 100)
-                                                    return (
-                                                        <div key={estado}>
-                                                            <div className="flex justify-between items-center mb-1">
-                                                                <span className="text-gray-400 text-xs">{estado}</span>
-                                                                <span className={`text-xs font-bold ${colores[estado].text}`}>{count}</span>
-                                                            </div>
-                                                            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                                                                <div className={`h-full rounded-full transition-all duration-700 ${colores[estado].bar}`} style={{ width: `${pct}%` }}/>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                                {ordenesActivas.length === 0 && <p className="text-gray-600 text-xs text-center py-4">Sin órdenes activas</p>}
-                                            </div>
-                                        )
-                                    })()}
-                                </div>
-                                <div className="bg-[#111318] border border-white/8 rounded-2xl p-5">
-                                    <p className="text-white text-sm font-semibold mb-4">Resumen del día</p>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                            <span className="text-gray-400 text-sm">Total vendido</span>
-                                            <span className="text-green-400 font-bold">${Number(ventasDia.total_ventas || 0).toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                            <span className="text-gray-400 text-sm">Órdenes cerradas</span>
-                                            <span className="text-white font-bold">{ventasDia.total_ordenes || 0}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b border-white/5">
-                                            <span className="text-gray-400 text-sm">Ticket promedio</span>
-                                            <span className="text-blue-400 font-bold">
-                                                ${ventasDia.total_ordenes > 0
-                                                    ? (Number(ventasDia.total_ventas) / Number(ventasDia.total_ordenes)).toFixed(2)
-                                                    : '0.00'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2">
-                                            <span className="text-gray-400 text-sm">Órdenes activas</span>
-                                            <span className="text-yellow-400 font-bold">{ordenesActivas.length}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-[#111318] border border-white/8 rounded-2xl overflow-hidden">
-                                <div className="px-5 py-4 border-b border-white/8 flex justify-between items-center">
-                                    <span className="text-white text-sm font-semibold">Órdenes activas</span>
-                                    <button onClick={() => cambiarPagina('ordenes')} className="text-blue-400 text-xs">Ver todas →</button>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="border-b border-white/5">
-                                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">#</th>
-                                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">Mesa</th>
-                                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide hidden md:table-cell">Mesero</th>
-                                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">Total</th>
-                                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">Estado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {ordenesActivas.length === 0 ? (
-                                                <tr><td colSpan="5" className="text-center text-gray-500 text-sm py-8">No hay órdenes activas</td></tr>
-                                            ) : ordenesActivas.map(orden => (
-                                                <tr key={orden.orden_id} className="border-b border-white/4 hover:bg-white/2">
-                                                    <td className="px-5 py-3 text-white text-sm font-semibold">#{orden.orden_id}</td>
-                                                    <td className="px-5 py-3 text-gray-300 text-sm">Mesa {orden.nro_mesa}</td>
-                                                    <td className="px-5 py-3 text-gray-400 text-sm hidden md:table-cell">{orden.mesero}</td>
-                                                    <td className="px-5 py-3 text-blue-400 text-sm font-bold">${Number(orden.total).toFixed(2)}</td>
-                                                    <td className="px-5 py-3">
-                                                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getBadge(orden.estado)}`}>{orden.estado}</span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+                        <DashboardHome
+                            ventasDia={ventasDia}
+                            ordenesActivas={ordenesActivas}
+                            mesas={mesas}
+                            ventasSemana={ventasSemana}
+                            ventasHora={ventasHora}
+                            getBadge={getBadge}
+                            cambiarPagina={cambiarPagina}
+                        />
                     )}
 
                     {paginaActiva === 'ordenes'  && <PaginaOrdenes getBadge={getBadge} />}
@@ -250,6 +185,186 @@ export default function Dashboard() {
                     {paginaActiva === 'menu'      && <PaginaMenu />}
                     {paginaActiva === 'usuarios'  && <PaginaUsuarios />}
                     {paginaActiva === 'caja'      && <PaginaCaja />}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+/* ==================== TOOLTIP CUSTOM ==================== */
+function ChartTooltip({ active, payload, label }) {
+    if (!active || !payload?.length) return null
+    return (
+        <div style={{ background: '#1a1d24', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 12px', fontSize: '12px' }}>
+            <p style={{ color: '#9CA3AF', marginBottom: '3px' }}>{label}</p>
+            <p style={{ color: '#fff', fontWeight: 700 }}>
+                ${payload[0].value.toFixed(2)}
+            </p>
+        </div>
+    )
+}
+
+/* ==================== DASHBOARD HOME ==================== */
+function DashboardHome({ ventasDia, ordenesActivas, mesas, ventasSemana, ventasHora, getBadge, cambiarPagina }) {
+    const totalVentas   = Number(ventasDia.total_ventas || 0)
+    const totalOrdenes  = Number(ventasDia.total_ordenes || 0)
+    const ticketProm    = totalOrdenes > 0 ? totalVentas / totalOrdenes : 0
+    const mesasOcupadas = mesas.filter(m => m.estado !== 'Disponible').length
+
+    const stats = [
+        { label: 'Ventas del día',   value: `$${totalVentas.toFixed(2)}`,  icon: DollarSign,  color: '#22C55E', bg: 'rgba(34,197,94,0.12)'    },
+        { label: 'Pedidos activos',  value: ordenesActivas.length,         icon: ShoppingBag, color: '#667EEA', bg: 'rgba(102,126,234,0.12)'  },
+        { label: 'Mesas ocupadas',   value: `${mesasOcupadas}/${mesas.length}`, icon: Users,  color: '#FBBF24', bg: 'rgba(251,191,36,0.12)'   },
+        { label: 'Ticket promedio',  value: `$${ticketProm.toFixed(2)}`,   icon: TrendingUp,  color: '#1A6FF5', bg: 'rgba(26,111,245,0.12)'   },
+    ]
+
+    const cocinaEstados = [
+        { label: 'Pendientes',  estado: 'Pendiente',  color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)'   },
+        { label: 'En cocina',   estado: 'EnCocina',   color: '#667EEA', bg: 'rgba(102,126,234,0.1)',  border: 'rgba(102,126,234,0.2)'  },
+        { label: 'Listas',      estado: 'Lista',      color: '#22C55E', bg: 'rgba(34,197,94,0.1)',    border: 'rgba(34,197,94,0.2)'    },
+        { label: 'Por cobrar',  estado: 'PorCobrar',  color: '#F97316', bg: 'rgba(249,115,22,0.1)',   border: 'rgba(249,115,22,0.2)'   },
+    ]
+
+    return (
+        <div className="space-y-5">
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                {stats.map((s, i) => {
+                    const Icon = s.icon
+                    return (
+                        <div key={i} className="bg-[#111318] border border-white/8 rounded-2xl p-4 md:p-5">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                    style={{ background: s.bg }}>
+                                    <Icon size={17} style={{ color: s.color }} />
+                                </div>
+                            </div>
+                            <p className="text-white text-xl md:text-2xl font-bold leading-none mb-1">{s.value}</p>
+                            <p className="text-gray-500 text-xs">{s.label}</p>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Gráficos fila */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Bar chart ventas semana */}
+                <div className="lg:col-span-2 bg-[#111318] border border-white/8 rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-5">
+                        <div>
+                            <p className="text-white text-sm font-semibold">Ventas de la semana</p>
+                            <p className="text-gray-500 text-xs mt-0.5">
+                                Total: ${ventasSemana.reduce((s, d) => s + d.ventas, 0).toFixed(2)}
+                            </p>
+                        </div>
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg"
+                            style={{ background: 'rgba(102,126,234,0.1)', border: '1px solid rgba(102,126,234,0.2)', color: '#667EEA' }}>
+                            Últimos 7 días
+                        </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={ventasSemana} barSize={24}>
+                            <defs>
+                                <linearGradient id="barG" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#667EEA" />
+                                    <stop offset="100%" stopColor="#764BA2" />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                            <XAxis dataKey="dia" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => `$${v}`} width={50} />
+                            <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                            <Bar dataKey="ventas" fill="url(#barG)" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Estado cocina */}
+                <div className="bg-[#111318] border border-white/8 rounded-2xl p-5">
+                    <p className="text-white text-sm font-semibold mb-4">Estado de cocina</p>
+                    <div className="space-y-3">
+                        {cocinaEstados.map(e => {
+                            const count = ordenesActivas.filter(o => o.estado === e.estado).length
+                            return (
+                                <div key={e.estado} className="flex items-center justify-between rounded-xl px-4 py-3"
+                                    style={{ background: e.bg, border: `1px solid ${e.border}` }}>
+                                    <p className="text-sm font-medium" style={{ color: e.color }}>{e.label}</p>
+                                    <p className="text-2xl font-bold" style={{ color: e.color, lineHeight: 1 }}>{count}</p>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center">
+                        <p className="text-gray-500 text-xs">Total en curso</p>
+                        <p className="text-white text-lg font-bold">{ordenesActivas.length}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Area chart ventas del día */}
+            <div className="bg-[#111318] border border-white/8 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <p className="text-white text-sm font-semibold">Ventas del día por hora</p>
+                        <p className="text-gray-500 text-xs mt-0.5">Ingresos acumulados hoy</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ background: '#667EEA' }}/>
+                        <span className="text-gray-400 text-xs">Ventas ($)</span>
+                    </div>
+                </div>
+                <ResponsiveContainer width="100%" height={140}>
+                    <AreaChart data={ventasHora}>
+                        <defs>
+                            <linearGradient id="areaG" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#667EEA" stopOpacity={0.25} />
+                                <stop offset="100%" stopColor="#667EEA" stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                        <XAxis dataKey="hora" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 10 }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 10 }} tickFormatter={v => `$${v}`} width={45} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'rgba(102,126,234,0.3)', strokeWidth: 1 }} />
+                        <Area type="monotone" dataKey="ventas" stroke="#667EEA" strokeWidth={2} fill="url(#areaG)" />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+
+            {/* Órdenes activas recientes */}
+            <div className="bg-[#111318] border border-white/8 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-white/8 flex justify-between items-center">
+                    <p className="text-white text-sm font-semibold">Órdenes activas</p>
+                    <button onClick={() => cambiarPagina('ordenes')} className="text-blue-400 text-xs hover:text-blue-300 transition">
+                        Ver todas →
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="border-b border-white/5">
+                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">#</th>
+                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">Mesa</th>
+                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide hidden md:table-cell">Mesero</th>
+                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">Total</th>
+                                <th className="text-left text-xs text-gray-500 font-medium px-5 py-3 uppercase tracking-wide">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {ordenesActivas.length === 0 ? (
+                                <tr><td colSpan="5" className="text-center text-gray-500 text-sm py-8">No hay órdenes activas</td></tr>
+                            ) : ordenesActivas.slice(0, 8).map(orden => (
+                                <tr key={orden.orden_id} className="border-b border-white/4 hover:bg-white/2">
+                                    <td className="px-5 py-3 text-blue-400 text-sm font-bold">#{orden.orden_id}</td>
+                                    <td className="px-5 py-3 text-gray-200 text-sm">Mesa {orden.nro_mesa}</td>
+                                    <td className="px-5 py-3 text-gray-400 text-sm hidden md:table-cell">{orden.mesero}</td>
+                                    <td className="px-5 py-3 text-white text-sm font-semibold">${Number(orden.total).toFixed(2)}</td>
+                                    <td className="px-5 py-3">
+                                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getBadge(orden.estado)}`}>{orden.estado}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
