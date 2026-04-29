@@ -137,6 +137,11 @@ export default function Cocina() {
                                                 </span>
                                                 <div className="min-w-0">
                                                     <p className="text-white text-sm font-semibold leading-snug">{p.producto}</p>
+                                                    {p.descripcion && (
+                                                        <p className="text-gray-400 text-xs mt-0.5">
+                                                            📋 {p.descripcion}
+                                                        </p>
+                                                    )}
                                                     {p.observacion && (
                                                         <p className="text-yellow-400 text-xs mt-0.5 font-medium">
                                                             ⚠ {p.observacion}

@@ -158,7 +158,7 @@ const cambiarEstado = async (req, res) => {
         res.json({ mensaje: `Orden actualizada a ${estado}` });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Error actualizando orden' });
+        res.status(500).json({ error: 'Error actualizando orden', detalle: err.message });
     }
 };
 
@@ -213,9 +213,10 @@ const getOrdenesCocinero = async (req, res) => {
                     (o.fecha_lista IS NOT NULL) AS reagendada,
                     json_agg(
                         json_build_object(
-                            'detalle_id', od.detalle_id,
-                            'producto',   p.nombre,
-                            'cantidad',   od.cantidad,
+                            'detalle_id',  od.detalle_id,
+                            'producto',    p.nombre,
+                            'descripcion', p.descripcion,
+                            'cantidad',    od.cantidad,
                             'observacion', od.observacion
                         ) ORDER BY od.detalle_id
                     ) AS productos

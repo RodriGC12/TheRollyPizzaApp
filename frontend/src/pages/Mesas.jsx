@@ -123,7 +123,8 @@ export default function Mesas() {
             await cargar()
             setMsg('✅ Cuenta enviada a caja')
         } catch (err) {
-            setMsg(err.response?.data?.error || 'Error enviando a cobro')
+            const e = err.response?.data
+            setMsg('❌ ' + (e?.detalle || e?.error || 'Error enviando a cobro'))
         } finally {
             setCargando(false)
         }

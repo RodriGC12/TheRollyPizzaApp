@@ -934,14 +934,14 @@ function PaginaMenu() {
 
 /* ==================== USUARIOS ==================== */
 function PaginaUsuarios() {
-    const [usuarios, setUsuarios] = useState([])
-    const [roles, setRoles] = useState([])
-    const [form, setForm] = useState({ rol_id: '', nombre_completo: '', nombre_usuario: '', password: '' })
-    const [editando, setEditando] = useState(null)
-    const [cambioPass, setCambioPass] = useState(null)
-    const [nuevaPass, setNuevaPass] = useState('')
+    const [usuarios,    setUsuarios]    = useState([])
+    const [roles,       setRoles]       = useState([])
+    const [form,        setForm]        = useState({ rol_id: '', nombre_completo: '', nombre_usuario: '', password: '' })
+    const [editando,    setEditando]    = useState(null)
+    const [cambioPass,  setCambioPass]  = useState(null)
+    const [nuevaPass,   setNuevaPass]   = useState('')
     const [mostrarForm, setMostrarForm] = useState(false)
-    const [msg, setMsg] = useState('')
+    const [msg,         setMsg]         = useState({ texto: '', tipo: '' })
 
     useEffect(() => { cargar() }, [])
 
@@ -951,148 +951,295 @@ function PaginaUsuarios() {
         setRoles(r.data)
     }
 
+    const mostrarMsg = (texto, tipo = 'ok') => {
+        setMsg({ texto, tipo })
+        setTimeout(() => setMsg({ texto: '', tipo: '' }), 3500)
+    }
+
+    const abrirNuevo = () => {
+        setEditando(null)
+        setForm({ rol_id: '', nombre_completo: '', nombre_usuario: '', password: '' })
+        setMostrarForm(true)
+    }
+
     const abrirEditar = (u) => {
         setEditando(u)
         setForm({ rol_id: u.rol_id || '', nombre_completo: u.nombre_completo, nombre_usuario: u.nombre_usuario, password: '' })
         setMostrarForm(true)
-        setMsg('')
     }
+
+    const cerrarForm = () => { setMostrarForm(false); setEditando(null) }
 
     const guardar = async (e) => {
         e.preventDefault()
         try {
             if (editando) {
                 await api.put(`/usuarios/${editando.usuario_id}`, { nombre_completo: form.nombre_completo, nombre_usuario: form.nombre_usuario, rol_id: form.rol_id })
-                setMsg('Usuario actualizado correctamente')
+                mostrarMsg('Usuario actualizado correctamente')
             } else {
                 await api.post('/usuarios', form)
-                setMsg('Usuario creado correctamente')
+                mostrarMsg('Usuario creado correctamente')
             }
-            setMostrarForm(false)
-            setEditando(null)
+            cerrarForm()
             cargar()
         } catch (err) {
-            setMsg(err.response?.data?.error || 'Error guardando usuario')
+            mostrarMsg(err.response?.data?.error || 'Error guardando usuario', 'err')
         }
     }
 
     const guardarPassword = async (id) => {
+        if (!nuevaPass.trim()) return
         try {
             await api.patch(`/usuarios/${id}/password`, { password: nuevaPass })
-            setMsg('Contraseña actualizada correctamente')
+            mostrarMsg('Contraseña actualizada')
             setCambioPass(null)
             setNuevaPass('')
         } catch (err) {
-            setMsg(err.response?.data?.error || 'Error cambiando contraseña')
+            mostrarMsg(err.response?.data?.error || 'Error cambiando contraseña', 'err')
         }
     }
 
     const eliminar = async (id) => {
-        if (!confirm('¿Eliminar este usuario?')) return
+        if (!confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')) return
         try {
             await api.delete(`/usuarios/${id}`)
+            mostrarMsg('Usuario eliminado')
             cargar()
         } catch (err) {
-            alert(err.response?.data?.error || 'Error eliminando usuario')
+            mostrarMsg(err.response?.data?.error || 'Error eliminando usuario', 'err')
         }
     }
 
-    const toggleActivo = async (id) => {
-        await api.patch(`/usuarios/${id}`)
-        cargar()
+    const toggleActivo = async (u) => {
+        try {
+            await api.patch(`/usuarios/${u.usuario_id}`)
+            cargar()
+        } catch (err) {
+            mostrarMsg('Error cambiando estado', 'err')
+        }
     }
 
-    const colores = ['bg-blue-900 text-blue-300', 'bg-green-900 text-green-300', 'bg-yellow-900 text-yellow-300', 'bg-purple-900 text-purple-300']
+    const rolConfig = {
+        'Administrador': { bg: 'from-[#667EEA] to-[#764BA2]', badge: 'bg-purple-500/15 border-purple-500/30 text-purple-300', icon: '👑' },
+        'Cajero':        { bg: 'from-green-600 to-green-800',  badge: 'bg-green-500/15 border-green-500/30 text-green-300',   icon: '💰' },
+        'Mesero':        { bg: 'from-blue-500 to-blue-800',    badge: 'bg-blue-500/15 border-blue-500/30 text-blue-300',     icon: '🍽' },
+        'Cocina':        { bg: 'from-orange-500 to-red-700',   badge: 'bg-orange-500/15 border-orange-500/30 text-orange-300', icon: '👨‍🍳' },
+    }
+    const getRol = (nombre) => rolConfig[nombre] || { bg: 'from-gray-600 to-gray-800', badge: 'bg-white/10 border-white/20 text-gray-300', icon: '👤' }
+
+    const inputCls = "w-full bg-[#1a1d24] border border-white/8 rounded-xl px-4 py-3 text-white text-sm outline-none transition placeholder-gray-600"
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-5">
-                <p className="text-gray-400 text-sm">{usuarios.length} usuarios registrados</p>
-                <button onClick={() => { setEditando(null); setForm({ rol_id: '', nombre_completo: '', nombre_usuario: '', password: '' }); setMostrarForm(true); setMsg('') }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 rounded-xl transition">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                <div>
+                    <h2 className="text-white font-bold text-lg">Usuarios</h2>
+                    <p className="text-gray-500 text-sm">{usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado{usuarios.length !== 1 ? 's' : ''}</p>
+                </div>
+                <button onClick={abrirNuevo}
+                    className="flex items-center gap-2 text-sm font-bold text-white px-5 py-2.5 rounded-xl transition active:scale-95 self-start sm:self-auto"
+                    style={{ background: 'linear-gradient(135deg, #667EEA, #764BA2)', boxShadow: '0 4px 14px rgba(102,126,234,0.35)' }}>
                     + Nuevo usuario
                 </button>
             </div>
 
-            {msg && <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm px-4 py-3 rounded-xl mb-4">{msg}</div>}
-
-            {mostrarForm && (
-                <form onSubmit={guardar} className="bg-[#111318] border border-white/8 rounded-2xl p-5 mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <p className="md:col-span-2 text-white text-sm font-semibold">{editando ? 'Editar usuario' : 'Nuevo usuario'}</p>
-                    <input required placeholder="Nombre completo" value={form.nombre_completo}
-                        onChange={e => setForm({...form, nombre_completo: e.target.value})}
-                        className="bg-[#1a1d24] border border-white/8 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500"/>
-                    <input required placeholder="Nombre de usuario" value={form.nombre_usuario}
-                        onChange={e => setForm({...form, nombre_usuario: e.target.value})}
-                        className="bg-[#1a1d24] border border-white/8 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500"/>
-                    {!editando && (
-                        <input required type="password" placeholder="Contraseña" value={form.password}
-                            onChange={e => setForm({...form, password: e.target.value})}
-                            className="bg-[#1a1d24] border border-white/8 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500"/>
-                    )}
-                    <select required value={form.rol_id} onChange={e => setForm({...form, rol_id: e.target.value})}
-                        className="bg-[#1a1d24] border border-white/8 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500">
-                        <option value="">Seleccionar rol</option>
-                        {roles.map(r => <option key={r.rol_id} value={r.rol_id}>{r.nombre}</option>)}
-                    </select>
-                    <div className="md:col-span-2 flex gap-3 justify-end">
-                        <button type="button" onClick={() => { setMostrarForm(false); setEditando(null) }}
-                            className="px-4 py-2 text-gray-400 border border-white/8 rounded-xl text-sm hover:text-white transition">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition">
-                            {editando ? 'Guardar cambios' : 'Crear usuario'}
-                        </button>
-                    </div>
-                </form>
+            {/* Toast */}
+            {msg.texto && (
+                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm mb-5 ${
+                    msg.tipo === 'err'
+                        ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                        : 'bg-green-500/10 border-green-500/20 text-green-400'
+                }`}>
+                    <span>{msg.tipo === 'err' ? '⚠' : '✓'}</span>
+                    {msg.texto}
+                </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {usuarios.map((u, i) => (
-                    <div key={u.usuario_id} className="bg-[#111318] border border-white/8 rounded-2xl p-5">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold ${colores[i % colores.length]}`}>
-                                {u.nombre_completo.charAt(0)}
+            {/* Grid de usuarios */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {usuarios.map(u => {
+                    const rc = getRol(u.rol)
+                    return (
+                        <div key={u.usuario_id}
+                            className={`bg-[#111318] rounded-2xl overflow-hidden border transition-all ${
+                                u.activo ? 'border-white/8' : 'border-red-500/20 opacity-70'
+                            }`}>
+
+                            {/* Card header con avatar */}
+                            <div className="px-5 pt-5 pb-4 flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${rc.bg} flex items-center justify-center text-white font-black text-lg flex-shrink-0`}
+                                    style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                                    {u.nombre_completo.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-white font-bold text-sm truncate">{u.nombre_completo}</p>
+                                    <p className="text-gray-500 text-xs truncate">@{u.nombre_usuario}</p>
+                                </div>
+                                {/* Toggle activo */}
+                                <button onClick={() => toggleActivo(u)}
+                                    title={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                                    className={`w-10 h-6 rounded-full border transition-all flex-shrink-0 relative ${
+                                        u.activo
+                                            ? 'bg-green-500/20 border-green-500/40'
+                                            : 'bg-red-500/20 border-red-500/40'
+                                    }`}>
+                                    <span className={`absolute top-0.5 w-5 h-5 rounded-full transition-all ${
+                                        u.activo
+                                            ? 'left-4 bg-green-400'
+                                            : 'left-0.5 bg-red-400'
+                                    }`}/>
+                                </button>
+                            </div>
+
+                            {/* Rol badge */}
+                            <div className="px-5 pb-4">
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${rc.badge}`}>
+                                    <span>{rc.icon}</span>
+                                    {u.rol}
+                                </span>
+                                {!u.activo && (
+                                    <span className="ml-2 inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-lg border bg-red-500/10 border-red-500/25 text-red-400">
+                                        Inactivo
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Campo cambio de contraseña inline */}
+                            {cambioPass === u.usuario_id && (
+                                <div className="px-5 pb-4">
+                                    <div className="bg-[#1a1d24] border border-white/8 rounded-xl p-3 space-y-2">
+                                        <p className="text-gray-400 text-xs font-semibold">Nueva contraseña</p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="password"
+                                                placeholder="Mínimo 6 caracteres..."
+                                                value={nuevaPass}
+                                                onChange={e => setNuevaPass(e.target.value)}
+                                                className="flex-1 bg-[#22262f] border border-white/8 rounded-lg px-3 py-2 text-white text-xs outline-none"
+                                                style={{ fontSize: '16px' }}
+                                                onFocus={e => e.target.style.borderColor = '#667EEA'}
+                                                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+                                                onKeyDown={e => e.key === 'Enter' && guardarPassword(u.usuario_id)}
+                                            />
+                                            <button onClick={() => guardarPassword(u.usuario_id)}
+                                                className="px-3 py-2 rounded-lg text-white text-xs font-bold flex-shrink-0"
+                                                style={{ background: 'linear-gradient(135deg, #667EEA, #764BA2)' }}>
+                                                OK
+                                            </button>
+                                            <button onClick={() => { setCambioPass(null); setNuevaPass('') }}
+                                                className="px-2 py-2 rounded-lg text-gray-400 border border-white/8 text-xs hover:text-white transition">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Acciones */}
+                            <div className="px-5 pb-5 flex gap-2">
+                                <button onClick={() => abrirEditar(u)}
+                                    className="flex-1 text-xs font-semibold py-2 rounded-xl border transition"
+                                    style={{ background: 'rgba(102,126,234,0.08)', borderColor: 'rgba(102,126,234,0.2)', color: '#a78bfa' }}>
+                                    ✏ Editar
+                                </button>
+                                <button onClick={() => { setCambioPass(cambioPass === u.usuario_id ? null : u.usuario_id); setNuevaPass('') }}
+                                    className={`flex-1 text-xs font-semibold py-2 rounded-xl border transition ${
+                                        cambioPass === u.usuario_id
+                                            ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300'
+                                            : 'bg-yellow-500/8 border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/15'
+                                    }`}>
+                                    🔑 Clave
+                                </button>
+                                <button onClick={() => eliminar(u.usuario_id)}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl border bg-red-500/8 border-red-500/20 text-red-400/60 hover:text-red-400 hover:bg-red-500/15 hover:border-red-500/35 transition text-xs flex-shrink-0">
+                                    🗑
+                                </button>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Modal crear/editar */}
+            {mostrarForm && (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+                    onClick={cerrarForm}>
+                    <div className="bg-[#111318] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden"
+                        onClick={e => e.stopPropagation()}>
+
+                        {/* Modal header */}
+                        <div className="px-6 py-4 border-b border-white/8 flex items-center justify-between"
+                            style={{ background: 'linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.04))' }}>
+                            <div>
+                                <p className="text-white font-bold">{editando ? 'Editar usuario' : 'Nuevo usuario'}</p>
+                                <p className="text-gray-500 text-xs">{editando ? `Modificando @${editando.nombre_usuario}` : 'Completá los datos del nuevo usuario'}</p>
+                            </div>
+                            <button onClick={cerrarForm}
+                                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/8 text-gray-400 hover:text-white flex items-center justify-center text-sm transition">
+                                ✕
+                            </button>
+                        </div>
+
+                        <form onSubmit={guardar} className="p-6 space-y-4">
+                            <div>
+                                <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">Nombre completo</label>
+                                <input required placeholder="Ej: Juan Pérez" value={form.nombre_completo}
+                                    onChange={e => setForm({ ...form, nombre_completo: e.target.value })}
+                                    className={inputCls}
+                                    style={{ fontSize: '16px' }}
+                                    onFocus={e => e.target.style.borderColor = '#667EEA'}
+                                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}/>
                             </div>
                             <div>
-                                <p className="text-white text-sm font-semibold">{u.nombre_completo}</p>
-                                <p className="text-gray-500 text-xs">{u.rol} · @{u.nombre_usuario}</p>
+                                <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">Nombre de usuario</label>
+                                <input required placeholder="Ej: juan.perez" value={form.nombre_usuario}
+                                    onChange={e => setForm({ ...form, nombre_usuario: e.target.value })}
+                                    autoCapitalize="none" autoCorrect="off"
+                                    className={inputCls}
+                                    style={{ fontSize: '16px' }}
+                                    onFocus={e => e.target.style.borderColor = '#667EEA'}
+                                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}/>
                             </div>
-                        </div>
-                        <hr className="border-white/8 mb-3"/>
-                        {cambioPass === u.usuario_id && (
-                            <div className="flex gap-2 mb-3">
-                                <input type="password" placeholder="Nueva contraseña..." value={nuevaPass}
-                                    onChange={e => setNuevaPass(e.target.value)}
-                                    className="flex-1 bg-[#1a1d24] border border-white/8 rounded-lg px-3 py-1.5 text-white text-xs outline-none focus:border-blue-500"/>
-                                <button onClick={() => guardarPassword(u.usuario_id)}
-                                    className="bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold">OK</button>
-                                <button onClick={() => { setCambioPass(null); setNuevaPass('') }}
-                                    className="text-gray-400 border border-white/8 text-xs px-2 py-1.5 rounded-lg">✕</button>
+                            {!editando && (
+                                <div>
+                                    <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">Contraseña</label>
+                                    <input required type="password" placeholder="Mínimo 6 caracteres" value={form.password}
+                                        onChange={e => setForm({ ...form, password: e.target.value })}
+                                        className={inputCls}
+                                        style={{ fontSize: '16px' }}
+                                        onFocus={e => e.target.style.borderColor = '#667EEA'}
+                                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}/>
+                                </div>
+                            )}
+                            <div>
+                                <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">Rol</label>
+                                <select required value={form.rol_id}
+                                    onChange={e => setForm({ ...form, rol_id: e.target.value })}
+                                    className={inputCls}
+                                    style={{ fontSize: '16px' }}
+                                    onFocus={e => e.target.style.borderColor = '#667EEA'}
+                                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}>
+                                    <option value="">Seleccionar rol...</option>
+                                    {roles.map(r => <option key={r.rol_id} value={r.rol_id}>{r.nombre}</option>)}
+                                </select>
                             </div>
-                        )}
-                        <div className="flex gap-2 flex-wrap">
-                            <button onClick={() => abrirEditar(u)}
-                                className="text-xs px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/20 transition">
-                                Editar
-                            </button>
-                            <button onClick={() => { setCambioPass(u.usuario_id); setNuevaPass('') }}
-                                className="text-xs px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/20 transition">
-                                Contraseña
-                            </button>
-                            <button onClick={() => toggleActivo(u.usuario_id)}
-                                className={`text-xs px-3 py-1.5 rounded-lg border transition
-                                    ${u.activo
-                                        ? 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400'
-                                        : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-green-500/10 hover:border-green-500/20 hover:text-green-400'}`}>
-                                {u.activo ? 'Activo' : 'Inactivo'}
-                            </button>
-                            <button onClick={() => eliminar(u.usuario_id)}
-                                className="text-xs px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg hover:bg-red-500/20 transition">
-                                Eliminar
-                            </button>
-                        </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={cerrarForm}
+                                    className="flex-1 py-3 text-gray-400 border border-white/8 rounded-xl text-sm font-medium hover:text-white hover:bg-white/5 transition">
+                                    Cancelar
+                                </button>
+                                <button type="submit"
+                                    className="flex-1 py-3 text-white rounded-xl text-sm font-bold transition active:scale-[0.98]"
+                                    style={{ background: 'linear-gradient(135deg, #667EEA, #764BA2)', boxShadow: '0 4px 14px rgba(102,126,234,0.3)' }}>
+                                    {editando ? 'Guardar cambios' : 'Crear usuario'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -1156,6 +1303,8 @@ function PaginaCaja() {
         try {
             await api.patch(`/ordenes/${orden.orden_id}/estado`, { estado: 'Cerrada' })
             setMsg(`✅ Cobro registrado — Mesa ${orden.nro_mesa} · $${Number(orden.total).toFixed(2)}`)
+            const res = await api.get(`/ordenes/${orden.orden_id}`)
+            generarFacturaPDF(orden, res.data.productos)
             cargar()
         } catch (err) {
             setMsg('❌ ' + (err.response?.data?.error || 'Error registrando cobro'))
